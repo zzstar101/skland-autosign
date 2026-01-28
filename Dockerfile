@@ -1,39 +1,22 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files and workspace config
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY go ./go
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+WORKDIR /app/go
 
-# Copy source code
-COPY . .
+RUN go build -o /app/skland-attendance ./cmd/skland-attendance
 
-# Build the application
-RUN pnpm run build
-
-# Production stage
-FROM node:20-alpine
+FROM alpine:3.19
 
 WORKDIR /app
 
-# Copy built application from builder stage
-COPY --from=builder /app/.output /app/.output
+COPY --from=builder /app/skland-attendance /app/skland-attendance
 
-# Create directory for local file storage (if needed)
-RUN mkdir -p /app/.data/kv
+ENV TOKENS=""
+ENV NOTIFICATION_URLS=""
+ENV MAX_RETRIES="3"
 
-# Expose port (optional, Nitro defaults to 3000)
-EXPOSE 3000
-
-# Set environment variables
-ENV NODE_ENV=production
-
-# Start the application
-CMD ["node", ".output/server/index.mjs"]
+ENTRYPOINT ["/app/skland-attendance"]
+CMD ["-mode=once"]

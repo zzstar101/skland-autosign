@@ -1,275 +1,161 @@
-# 森空岛签到
+## 森空岛签到（Go 版本）
 
-使用 TypeScript 实现的森空岛自动签到服务，支持多账号管理和多种推送通知方式。
+使用 Go 实现的森空岛自动签到服务，支持多账号管理和多种推送通知方式，适合 Docker、云函数、青龙面板等多种环境部署。
 
-基于 Nitro 构建，支持Node.js、Cloudflare Workers 等环境部署。
+> 说明：原有基于 Nitro/TypeScript 的实现仍然保留在仓库中，推荐在新环境优先使用 Go 版本。
 
-## 功能特点
+### 功能特点
 
 - 🌟 支持多账号管理
-- 🤖 自动定时执行签到任务
-- 📱 支持多种推送通知方式
+- 🤖 一次执行/定时任务均可使用（由外部调度，如 cron、云函数触发器、青龙计划任务）
+- 📱 支持多种推送通知方式（通过通用 Webhook URL）
 - 🔄 支持错误自动重试
 
-## 部署
+### 配置说明（环境变量）
 
-基于 Nitro 构建，使用 Scheduled Tasks 实现定时任务来签到，查看 [Nitro 文档](https://nitro.build/guide/tasks#platform-support) 了解支持的平台。
+- **`TOKENS`**：森空岛凭据，多个账号用逗号分隔（必填）  
+  示例：`TOKENS=token1,token2`
+- **`NOTIFICATION_URLS`**：通知 URL 列表，多个用逗号分隔（可选）  
+  示例：`NOTIFICATION_URLS=https://your-webhook-url`
+- **`MAX_RETRIES`**：单角色签到失败时的最大重试次数，默认 `3`（可选）  
+  示例：`MAX_RETRIES=5`
 
-#### 快速部署到 Cloudflare Workers
+凭据获取方式与原项目一致：登录森空岛或鹰角通行证，访问对应接口获取 `content` 字段值，然后填入 `TOKENS`。
 
-通过一键部署到 Cloudflare Workers，只需要[配置对应的环境变量](#手动部署需要的配置)即可
+### 本地运行（Go）
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/enpitsuLin/skland-daily-attendance)
-
-#### GitHub Actions 部署
-
-通过 GitHub Actions 可以实现自动定时签到，无需额外的服务器资源。
-
-<details>
-  <summary>Github Action 部署</summary>
-
-  ##### 快速开始
-
-  1. **Fork 本仓库**
-
-     点击页面右上角的 Fork 按钮，将仓库 fork 到你的账号下。
-
-  2. **配置 GitHub Secrets**
-
-     进入你 fork 的仓库，依次点击 `Settings` → `Secrets and variables` → `Actions` → `New repository secret`，添加以下必要的密钥：
-
-     | Secret 名称 | 说明 | 是否必填 |
-     |------------|------|---------|
-     | `SKLAND_TOKENS` | 森空岛凭据，多个账号用逗号分隔 | 必填 |
-     | `SKLAND_NOTIFICATION_URLS` | 通知 URL，多个 URL 用逗号分隔 | 可选 |
-     | `MAX_RETRIES` | 最大重试次数，默认为 3 | 可选 |
-
-  3. **启用 GitHub Actions**
-
-     进入仓库的 `Actions` 标签页，如果看到提示，点击 `I understand my workflows, go ahead and enable them` 启用工作流。
-
-  4. **执行签到**
-
-     GitHub Actions 会在每天 16:00 (UTC) 自动执行签到任务。你也可以手动触发：
-
-     - 进入 `Actions` 标签页
-     - 选择 `attendance` 工作流
-     - 点击右侧的 `Run workflow` 按钮
-     - 点击绿色的 `Run workflow` 确认执行
-
-  ##### 工作流说明
-
-  - **attendance** (`.github/workflows/schedule.yml`)
-    - 自动签到工作流，每天 16:00 (UTC) 定时执行
-    - 支持手动触发和通过 `workflow_call` 被其他工作流调用
-
-  - **自动push防止Actions自动停止** (`.github/workflows/auto_push.yml`)
-    - 保活工作流，每月 1 号和 15 号自动创建空提交并推送
-    - 防止仓库长期无活动导致 GitHub Actions 被自动停用
-
-</details>
-
-##### 注意事项
-
-- GitHub Actions 免费额度为每月 2000 分钟，本项目的签到任务约消耗 1-2 分钟/次
-- 确保仓库为 Public 或拥有 GitHub Actions 的私有仓库配额
-- 如果长时间（60天）没有任何提交，GitHub 会自动停用 Actions，保活工作流会自动处理这个问题。（会带来额外的 commit 可能会导致与上游仓库无法及时同步）
-
-### 手动部署需要的配置
-
-#### 1. 配置凭据
-
-登录 [森空岛网页版](https://www.skland.com/) 后，打开 https://web-api.skland.com/account/info/hg 记下 content 字段的值
-
-或者登录 [鹰角网络通行证](https://user.hypergryph.com/login) 后打开 https://web-api.hypergryph.com/account/info/hg 记下 content 字段的值
-
-将获取的凭据设置到环境变量 `SKLAND_TOKENS` 中，多个凭据用逗号分隔。
+1. 安装 Go（建议 1.21+）。  
+2. 在项目根目录执行：
 
 ```bash
-SKLAND_TOKENS=your-token-1,your-token-2
+cd go
+go run ./cmd/skland-attendance -mode=once
 ```
 
-#### 2. 配置消息通知 (可选)
+运行前请在当前环境中设置好 `TOKENS`、`NOTIFICATION_URLS` 等变量。
 
-通过 [Statocysts](https://github.com/octoplorer/statocysts) 支持等多种通知方式，将对应格式的通知 URL 设置到环境变量 `SKLAND_NOTIFICATION_URLS` 中，多个 URL 用逗号分隔。
+### Docker 部署（Go 版本）
+
+项目根目录的 `Dockerfile` 已改为构建并运行 Go 版本，适合一次性执行的签到任务。
+
+#### 使用 Docker 构建并运行
 
 ```bash
-SKLAND_NOTIFICATION_URLS="Statocysts 格式通知 URL"
+docker build -t skland-attendance-go .
+
+docker run --rm \
+  -e TOKENS="your-token-1,your-token-2" \
+  -e NOTIFICATION_URLS="https://your-webhook-url" \
+  skland-attendance-go
 ```
 
-#### 3. 配置持久化存储 (可选)
+容器退出码为 `0` 表示全部账号成功或已签到，非 `0` 表示有失败账号，可用于外部告警或重试逻辑。
 
-项目支持使用持久化存储来记录每日签到状态。
+#### 使用 docker-compose 定时执行
 
-因为每次计划任务执行不一定签到成功，所以本服务在除了 Github Actions 的情况下使用，会通过每 2 小时执行的计划任务保证当天的签到任务成功，所以需要持久化储存对应日期的签到状态避免成功后重复签到。
+仓库中提供示例文件 `docker-compose.go-example.yml`：
 
-> [!WARNING]
-> 因为项目默认使用 2 小时的计划任务执行签到任务，所以在使用中不需要那么高的频率来执行签到任务，需要在 `nitro.config.ts` 中手动调整计划任务的执行频率。
-> 如果是 Cloudflare Workers 环境，同样需要调整 Worker 的 cron 定时器。
-
-项目支持多种 KV 存储方式，根据不同的部署环境选择合适的存储方案：
-
-##### Upstash Redis（推荐用于 Serverless 环境）
+- 可通过宿主机 crontab 定期执行：
 
 ```bash
-KV_REST_API_URL=https://your-upstash-redis.upstash.io
-KV_REST_API_TOKEN=your-token
+0 8 * * * cd /path/to/project && docker compose -f docker-compose.go-example.yml run --rm skland-attendance
 ```
 
-或使用 Upstash 环境变量：
+这样每天早上 8 点拉起一个容器执行一次签到，执行完自动退出并释放资源。
+
+### 云函数部署（通用说明）
+
+Go 版本提供了云函数入口示例 `go/cmd/lambda/main.go`，可用于 AWS Lambda 或其他支持 Go 的云函数平台。
+
+通用步骤：
+
+1. 在 `go/` 目录构建二进制并打包：
 
 ```bash
-UPSTASH_REDIS_REST_URL=https://your-upstash-redis.upstash.io
-UPSTASH_REDIS_REST_TOKEN=your-token
+cd go
+GOOS=linux GOARCH=amd64 go build -o bootstrap ./cmd/lambda
+zip function.zip bootstrap
 ```
 
-##### Redis
+2. 在云函数控制台创建函数：
+   - 运行时选择 Go（或使用自定义运行时，入口为打包好的 `bootstrap`）。
+   - 上传 `function.zip` 作为函数代码。
+   - 在环境变量中配置 `TOKENS`、`NOTIFICATION_URLS`、`MAX_RETRIES`。
+
+3. 创建定时触发器（如每日固定时间触发一次函数）。  
+
+函数返回的 JSON 中包含 `result` 字段和完整统计信息，方便在日志或监控中查看。
+
+### 青龙面板部署
+
+青龙面板可以通过两种方式使用本项目的 Go 版本：
+
+#### 方式 A：预编译二进制（推荐）
+
+1. 在本地或青龙容器中编译：
 
 ```bash
-REDIS_URL=rediss://default:password@your-redis-host:6379
+cd /path/to/repo/go
+go build -o skland-attendance ./cmd/skland-attendance
 ```
 
-或使用通用 KV URL：
+2. 将生成的 `skland-attendance` 放到青龙脚本目录，例如 `/ql/data/scripts/skland-attendance`。
+
+3. 在青龙面板中添加环境变量：
+   - `TOKENS`：森空岛凭据列表。
+   - `NOTIFICATION_URLS`：通知地址（可选）。
+   - `MAX_RETRIES`：最大重试次数（可选）。
+
+4. 在青龙中新增定时任务，命令示例：
 
 ```bash
-KV_URL=rediss://default:password@your-redis-host:6379
+cd /ql/data/scripts/skland-attendance && ./skland-attendance -mode=once
 ```
 
-##### AWS S3 兼容存储
+设置合适的 cron 表达式（例如每天 8 点执行一次）。
+
+#### 方式 B：源码直接运行
+
+1. 在青龙容器中克隆仓库：
 
 ```bash
-S3_ACCESS_KEY_ID=your-access-key
-S3_SECRET_ACCESS_KEY=your-secret-key
-S3_BUCKET=your-bucket-name
-S3_REGION=us-east-1
-S3_ENDPOINT=https://your-s3-endpoint.com  # 可选，用于兼容 S3 的存储服务
+cd /ql/data/scripts
+git clone https://github.com/yourname/skland-daily-attendance.git
 ```
 
-##### Cloudflare KV
-
-在 Cloudflare Workers 环境中会自动检测并使用，需要在 Cloudflare Dashboard 中创建名为 `KV` 的 KV 命名空间并绑定到项目。
-
-##### Deno KV
-
-在 Deno Deploy 环境中会自动检测并使用，无需额外配置。
-
-##### 本地文件存储（默认）
-
-如果未配置以上任何存储方式，将自动使用本地文件存储，数据保存在 `.data/kv` 目录下。
-
-##### 禁用持久化存储
-
-如果不需要持久化功能，可以设置：
+2. 在青龙任务中使用：
 
 ```bash
-DISABLE_KV=true
+cd /ql/data/scripts/skland-daily-attendance/go && go run ./cmd/skland-attendance -mode=once
 ```
 
-#### 4. 其他配置
+此方式每次执行会编译一次，耗时略长，适合调试或临时使用，长期推荐方式 A。
 
-##### 重试次数
+### HTTP 服务模式（兼容旧行为）
 
-可以通过环境变量 `SKLAND_MAX_RETRIES` 设置签到失败时的最大重试次数，默认为 3 次。
+如需通过 HTTP 调用的方式触发签到（类似原 Nitro `/_nitro/tasks/attendance`），可以使用 `http` 模式：
 
 ```bash
-SKLAND_MAX_RETRIES=5
+cd go
+go run ./cmd/skland-attendance -mode=http -addr=":8080"
 ```
 
-### Docker 部署
+然后通过 `GET http://your-host:8080/attendance` 触发签到，返回结果 JSON 中包含：
 
-本项目提供了 Docker 和 Docker Compose 配置，方便快速部署。
+```json
+{
+  "result": "success | failed",
+  "stats": { ... }
+}
+```
 
-<details>
-  <summary>Docker 部署</summary>
+你也可以在自建服务器或其他平台上将此服务部署为常驻进程，然后用外部定时任务访问该 HTTP 接口。
 
-  #### 使用 Docker Compose (推荐)
+### 注意事项
 
-  1. 创建 `.env` 文件并配置环境变量：
+- 本项目仅用于学习和研究目的，请合理使用，避免频繁调用 API 影响账号安全。
+- Go 版本默认使用内存存储“今日已签到”状态，适合一次执行的任务。例如 Docker 一次性容器、云函数、青龙任务等。
 
-  ```bash
-  # 必填：森空岛凭据，多个用逗号分隔
-  SKLAND_TOKENS=your-token-1,your-token-2
-
-  # 可选：通知 URL
-  SKLAND_NOTIFICATION_URLS=your-notification-url
-
-  # 可选：最大重试次数 (默认为 3)
-  SKLAND_MAX_RETRIES=3
-
-  # 可选：持久化存储配置 (使用 Upstash Redis)
-  # KV_REST_API_URL=https://your-upstash-redis.upstash.io
-  # KV_REST_API_TOKEN=your-token
-
-  # 可选：使用 Redis
-  # REDIS_URL=rediss://default:password@your-redis-host:6379
-
-  # 可选：使用 AWS S3 兼容存储
-  # S3_ACCESS_KEY_ID=your-access-key
-  # S3_SECRET_ACCESS_KEY=your-secret-key
-  # S3_BUCKET=your-bucket-name
-  # S3_REGION=us-east-1
-  # S3_ENDPOINT=https://your-s3-endpoint.com
-
-  # 可选：禁用持久化存储
-  # DISABLE_KV=false
-  ```
-
-  2. 启动服务：
-
-  ```bash
-  docker compose up -d
-  ```
-
-  3. 查看日志：
-
-  ```bash
-  docker compose logs -f
-  ```
-
-  4. 停止服务：
-
-  ```bash
-  docker compose down
-  ```
-
-  #### 使用 Docker
-
-  1. 构建镜像：
-
-  ```bash
-  docker build -t skland-attendance .
-  ```
-
-  2. 运行容器：
-
-  ```bash
-  docker run -d \
-    --name skland-attendance \
-    --restart unless-stopped \
-    -e SKLAND_TOKENS="your-token-1,your-token-2" \
-    -e SKLAND_NOTIFICATION_URLS="your-notification-url" \
-    -v $(pwd)/data:/app/.data \
-    skland-attendance
-  ```
-
-  #### Docker 部署注意事项
-
-  - 默认使用本地文件存储，数据会持久化到 `./data` 目录
-  - 如果需要使用 Redis 持久化，可以取消注释 `docker-compose.yml` 中的 Redis 服务配置
-  - 容器会按照 `nitro.config.ts` 中配置的定时任务自动执行签到 (默认每 2 小时执行一次)
-  - 如需调整定时任务频率，请修改 `nitro.config.ts` 中的 `scheduledTasks` 配置后重新构建镜像
-
-</details>
-
-## 注意事项
-
-- 本项目仅用于学习和研究目的
-- 请勿频繁调用 API，以免影响账号安全
-
-## 相关项目
-
-- [罗德岛远程指挥部](https://github.com/enpitsuLin/rhodes-headquarters) - 浏览器扩展，用于监控森空岛信息
-
-## License
+### License
 
 MIT

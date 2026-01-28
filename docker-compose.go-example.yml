@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  skland-attendance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # 必填：森空岛凭据，多个用逗号分隔
+      - TOKENS=your-token-1,your-token-2
+      # 可选：通知 URL，多个用逗号分隔
+      - NOTIFICATION_URLS=https://your-webhook-url
+      # 可选：最大重试次数（默认 3）
+      - MAX_RETRIES=3
+    restart: "no"
+    # 建议由宿主机的 crontab 定时执行 `docker compose run --rm skland-attendance`
+
