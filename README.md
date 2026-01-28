@@ -2,8 +2,6 @@
 
 使用 Go 实现的森空岛自动签到服务，支持多账号管理和多种推送通知方式，适合 Docker、云函数、青龙面板等多种环境部署。
 
-> 说明：原有基于 Nitro/TypeScript 的实现仍然保留在仓库中，推荐在新环境优先使用 Go 版本。
-
 ### 功能特点
 
 - 🌟 支持多账号管理
@@ -120,13 +118,13 @@ cd /ql/data/scripts/skland-attendance && ./skland-attendance -mode=once
 
 ```bash
 cd /ql/data/scripts
-git clone https://github.com/yourname/skland-daily-attendance.git
+git clone https://github.com/zzstar101/skland-autosign.git
 ```
 
 2. 在青龙任务中使用：
 
 ```bash
-cd /ql/data/scripts/skland-daily-attendance/go && go run ./cmd/skland-attendance -mode=once
+cd /ql/data/scripts/skland-autosign/go && go run ./cmd/skland-attendance -mode=once
 ```
 
 此方式每次执行会编译一次，耗时略长，适合调试或临时使用，长期推荐方式 A。
